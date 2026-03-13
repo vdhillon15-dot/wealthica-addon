@@ -36,8 +36,8 @@
     .btn-secondary{background:white;color:#5b21b6;border:1px solid #5b21b6}
     .btn:hover{opacity:.85}
     .token-box{display:none;background:#1a1a2e;color:#a78bfa;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:.75rem;word-break:break-all;margin-top:10px;position:relative}
-    .token-box .copy-hint{position:absolute;top:8px;right:10px;font-size:.7rem;color:#6b7280;cursor:pointer}
-    .toast{position:fixed;bottom:20px;right:20px;background:#065f46;color:white;padding:10px 18px;border-radius:8px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none}
+    .copy-hint{position:absolute;top:8px;right:10px;font-size:.7rem;color:#6b7280;cursor:pointer}
+    .toast{position:fixed;bottom:20px;right:20px;background:#065f46;color:white;padding:10px 18px;border-radius:8px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
     .toast.show{opacity:1}
   </style>
 </head>
@@ -54,11 +54,11 @@
   </div>
 
   <div class="toolbar">
-    <button class="btn btn-primary" onclick="refreshData()">⟳ Refresh</button>
-    <button class="btn btn-secondary" onclick="toggleToken()">🔑 Show API Token</button>
+    <button class="btn btn-primary" onclick="refreshData()">&#x21BB; Refresh</button>
+    <button class="btn btn-secondary" onclick="toggleToken()">&#x1F511; Show API Token</button>
   </div>
   <div class="token-box" id="tokenBox">
-    <span class="copy-hint" onclick="copyToken()">📋 Copy</span>
+    <span class="copy-hint" onclick="copyToken()">&#x1F4CB; Copy</span>
     <span id="tokenText"></span>
   </div>
 
@@ -76,92 +76,121 @@
 
   <script>
     var addon = new Addon();
-    var _positions = [], _transactions = [], _institutions = [];
+    var _token = null;
+    var BASE = 'https://app.wealthica.com/api';
+
+    function getToken() {
+      if (_token) return _token;
+      var key = Object.keys(localStorage).find(function(k){ return k.endsWith('.idToken'); });
+      return key ? localStorage.getItem(key) : null;
+    }
+
+    function apiFetch(path) {
+      var token = getToken();
+      return fetch(BASE + path, { headers: { 'Authorization': 'Bearer ' + token } }).then(function(r){ return r.json(); });
+    }
 
     function fmt(n){ return typeof n==='number' ? ('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})) : (n||'-'); }
+
     function showTab(id,btn){
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
       document.getElementById(id).classList.add('active');
       btn.classList.add('active');
     }
+
     function toast(msg){
       var t=document.getElementById('toast');
       t.textContent=msg; t.classList.add('show');
-      setTimeout(()=>t.classList.remove('show'),2500);
-    }
-    function toggleToken(){
-      var box=document.getElementById('tokenBox');
-      var showing = box.style.display==='block';
-      if(!showing){
-        var key = Object.keys(localStorage).find(k=>k.endsWith('.idToken'));
-        var token = key ? localStorage.getItem(key) : null;
-        if(token){ document.getElementById('tokenText').textContent=token; box.style.display='block'; }
-        else{ toast('Token not found — are you inside Wealthica?'); }
-      } else { box.style.display='none'; }
-    }
-    function copyToken(){
-      var token=document.getElementById('tokenText').textContent;
-      if(token){ navigator.clipboard.writeText(token).then(()=>toast('✅ Token copied to clipboard!')); }
-    }
-    function renderPositions(data){
-      var el=document.getElementById('positions');
-      if(!data.length){el.innerHTML='<p class="empty">No positions found.</p>';return;}
-      el.innerHTML='<table><thead><tr><th>Security</th><th>Symbol</th><th>Qty</th><th>Price</th><th>Value</th><th>Currency</th></tr></thead><tbody>'+
-        data.map(p=>'<tr><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.currency_price!=null?fmt(p.currency_price):'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>').join('')+'</tbody></table>';
-    }
-    function renderTransactions(data){
-      var el=document.getElementById('transactions');
-      if(!data.length){el.innerHTML='<p class="empty">No transactions found.</p>';return;}
-      el.innerHTML='<table><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+
-        data.map(t=>'<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+(t.type||'-')+'</td><td>'+(t.amount!=null?fmt(t.amount):'-')+'</td><td>'+(t.currency||'-')+'</td></tr>').join('')+'</tbody></table>';
-    }
-    function renderInstitutions(data){
-      var el=document.getElementById('institutions');
-      if(!data.length){el.innerHTML='<p class="empty">No institutions connected yet. Use + Add in Wealthica to connect a bank or broker.</p>';return;}
-      el.innerHTML='<table><thead><tr><th>Institution</th><th>Provider</th><th>Status</th><th>Last Sync</th></tr></thead><tbody>'+
-        data.map(i=>'<tr><td>'+(i.name||i.id||'-')+'</td><td>'+(i.provider||'-')+'</td><td>'+(i.status||'-')+'</td><td>'+(i.last_sync?i.last_sync.substring(0,10):'-')+'</td></tr>').join('')+'</tbody></table>';
+      setTimeout(function(){t.classList.remove('show');},2500);
     }
 
-    function loadData(a){
+    function toggleToken(){
+      var box=document.getElementById('tokenBox');
+      if(box.style.display==='block'){ box.style.display='none'; return; }
+      var token=getToken();
+      if(token){ document.getElementById('tokenText').textContent=token; box.style.display='block'; }
+      else { toast('Token not found'); }
+    }
+
+    function copyToken(){
+      var token=document.getElementById('tokenText').textContent;
+      if(token){ navigator.clipboard.writeText(token).then(function(){toast('Token copied!');});}
+    }
+
+    function renderPositions(data){
+      var el=document.getElementById('positions');
+      if(!data||!data.length){el.innerHTML='<p class="empty">No positions found.</p>';return;}
+      el.innerHTML='<table><thead><tr><th>Account</th><th>Security</th><th>Symbol</th><th>Qty</th><th>Price</th><th>Value</th><th>Currency</th></tr></thead><tbody>'+
+        data.map(function(p){return '<tr><td>'+(p.investment_cache&&p.investment_cache.name||'-')+'</td><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.currency_price!=null?fmt(p.currency_price):'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
+    }
+
+    function renderTransactions(data){
+      var el=document.getElementById('transactions');
+      if(!data||!data.length){el.innerHTML='<p class="empty">No transactions found.</p>';return;}
+      el.innerHTML='<table><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Type</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+
+        data.map(function(t){return '<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+(t.investment_cache&&t.investment_cache.name||'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+(t.type||'-')+'</td><td>'+(t.amount!=null?fmt(t.amount):'-')+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
+    }
+
+    function renderInstitutions(data){
+      var el=document.getElementById('institutions');
+      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected. Use + Add in Wealthica.</p>';return;}
+      el.innerHTML='<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>'+
+        data.map(function(i){
+          var accounts=(i.investments||[]).map(function(inv){return inv.name+'&nbsp;('+fmt(inv.currency_value)+')';}).join('<br>');
+          return '<tr><td>'+(i.name||'-')+'</td><td>'+(i.sync_status||'-')+'</td><td>'+(i.sync_status_details&&i.sync_status_details.date?i.sync_status_details.date.substring(0,10):'-')+'</td><td>'+accounts+'</td></tr>';
+        }).join('')+'</tbody></table>';
+    }
+
+    function loadData(){
+      document.getElementById('networth').textContent='...';
       document.getElementById('poscount').textContent='...';
       document.getElementById('txcount').textContent='...';
       document.getElementById('instcount').textContent='...';
-      document.getElementById('networth').textContent='...';
+      document.getElementById('positions').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+      document.getElementById('transactions').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+      document.getElementById('institutions').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+
       Promise.all([
-        a.api.getPositions().catch(()=>[]),
-        a.api.getTransactions({limit:200}).catch(()=>[]),
-        a.api.getInstitutions().catch(()=>[])
+        apiFetch('/positions').catch(function(){return [];}),
+        apiFetch('/transactions?limit=200').catch(function(){return [];}),
+        apiFetch('/institutions').catch(function(){return [];})
       ]).then(function(results){
-        _positions=results[0]||[]; _transactions=results[1]||[]; _institutions=results[2]||[];
-        var nw=_positions.reduce((s,p)=>s+(p.market_value||0),0);
+        var positions=results[0]||[];
+        var transactions=results[1]||[];
+        var institutions=results[2]||[];
+        var nw=institutions.reduce(function(s,inst){
+          return s+(inst.investments||[]).reduce(function(a,inv){return a+(inv.currency_value||0);},0);
+        },0);
         document.getElementById('networth').textContent=fmt(nw);
-        document.getElementById('poscount').textContent=_positions.length;
-        document.getElementById('txcount').textContent=_transactions.length;
-        document.getElementById('instcount').textContent=_institutions.length;
-        renderPositions(_positions);
-        renderTransactions(_transactions);
-        renderInstitutions(_institutions);
+        document.getElementById('poscount').textContent=positions.length;
+        document.getElementById('txcount').textContent=transactions.length;
+        document.getElementById('instcount').textContent=institutions.length;
+        renderPositions(positions);
+        renderTransactions(transactions);
+        renderInstitutions(institutions);
+      }).catch(function(e){
+        toast('Error loading data: '+e.message);
       });
     }
 
-    function refreshData(){ if(window._addon){ loadData(window._addon); toast('Refreshing...'); } }
+    function refreshData(){ loadData(); toast('Refreshing...'); }
 
-    addon.on('init', function(options, api){ 
-      window._addon={api:api};
+    addon.on('init', function(options, api){
       document.getElementById('status').className='status connected';
       document.getElementById('status').textContent='Connected to Wealthica';
-      loadData(window._addon);
+      loadData();
     });
-    addon.on('update', function(options){ if(window._addon){ loadData(window._addon); } });
-    addon.on('reload', function(){ if(window._addon){ loadData(window._addon); } });
+    addon.on('update', function(){ loadData(); });
+    addon.on('reload', function(){ loadData(); });
 
     setTimeout(function(){
       var s=document.getElementById('status');
       if(s.classList.contains('connecting')){
-        s.className='status error'; s.textContent='Not inside Wealthica';
+        s.className='status error';
+        s.textContent='Not inside Wealthica';
       }
-    }, 5000);
+    }, 6000);
   </script>
 </body>
 </html>
