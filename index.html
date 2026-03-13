@@ -77,35 +77,29 @@
   <script>
     var addon = new Addon();
     var BASE = 'https://app.wealthica.com/api';
-    var _sdkApi = null;
-    var _dataLoaded = false;
 
-    // Get token from parent window's localStorage via postMessage, or from local storage
     function getToken() {
-      // Try to get from parent frame's localStorage (we're in an iframe on app.wealthica.com)
+      // We are in an iframe inside app.wealthica.com — access parent's localStorage
       try {
-        var keys = Object.keys(window.parent.localStorage);
-        var key = keys.find(function(k){ return k.endsWith('.idToken'); });
-        if (key) return window.parent.localStorage.getItem(key);
+        var k = Object.keys(window.parent.localStorage).find(function(k){ return k.endsWith('.idToken'); });
+        if (k) return window.parent.localStorage.getItem(k);
       } catch(e) {}
-      // Fallback: try local
+      // Same-origin fallback
       try {
-        var key2 = Object.keys(localStorage).find(function(k){ return k.endsWith('.idToken'); });
-        if (key2) return localStorage.getItem(key2);
+        var k2 = Object.keys(localStorage).find(function(k){ return k.endsWith('.idToken'); });
+        if (k2) return localStorage.getItem(k2);
       } catch(e) {}
       return null;
     }
 
     function apiFetch(path) {
-      var token = getToken();
-      if (!token) return Promise.reject(new Error('No token'));
       return fetch(BASE + path, {
-        headers: { 'Authorization': 'Bearer ' + token },
-        credentials: 'include'
+        credentials: 'include',
+        headers: { 'Authorization': 'Bearer ' + getToken() }
       }).then(function(r){ return r.json(); });
     }
 
-    function fmt(n){ return typeof n==='number' ? ('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})) : (n||'-'); }
+    function fmt(n){ return typeof n==='number'?('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})):(n||'-'); }
 
     function showTab(id,btn){
       document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
@@ -122,22 +116,22 @@
 
     function toggleToken(){
       var box=document.getElementById('tokenBox');
-      if(box.style.display==='block'){ box.style.display='none'; return; }
-      var token=getToken();
-      if(token){ document.getElementById('tokenText').textContent=token; box.style.display='block'; }
-      else { toast('Token not found'); }
+      if(box.style.display==='block'){box.style.display='none';return;}
+      var tok=getToken();
+      if(tok){document.getElementById('tokenText').textContent=tok;box.style.display='block';}
+      else{toast('Token not found');}
     }
 
     function copyToken(){
-      var token=document.getElementById('tokenText').textContent;
-      if(token){ navigator.clipboard.writeText(token).then(function(){toast('Token copied!');});}
+      navigator.clipboard.writeText(document.getElementById('tokenText').textContent)
+        .then(function(){toast('Token copied!');});
     }
 
     function renderPositions(data){
       var el=document.getElementById('positions');
       if(!data||!data.length){el.innerHTML='<p class="empty">No positions found.</p>';return;}
-      el.innerHTML='<table><thead><tr><th>Account</th><th>Security</th><th>Symbol</th><th>Qty</th><th>Price</th><th>Value</th><th>Currency</th></tr></thead><tbody>'+
-        data.map(function(p){return '<tr><td>'+(p.investment_cache&&p.investment_cache.name||'-')+'</td><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.currency_price!=null?fmt(p.currency_price):'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
+      el.innerHTML='<table><thead><tr><th>Account</th><th>Security</th><th>Symbol</th><th>Qty</th><th>Value</th><th>Currency</th></tr></thead><tbody>'+
+        data.map(function(p){return '<tr><td>'+(p.investment_cache&&p.investment_cache.name||'-')+'</td><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
     }
 
     function renderTransactions(data){
@@ -149,79 +143,54 @@
 
     function renderInstitutions(data){
       var el=document.getElementById('institutions');
-      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected. Use + Add in Wealthica.</p>';return;}
+      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected.</p>';return;}
       el.innerHTML='<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>'+
         data.map(function(i){
-          var accounts=(i.investments||[]).map(function(inv){return inv.name+'&nbsp;('+fmt(inv.currency_value)+')';}).join('<br>');
-          return '<tr><td>'+(i.name||'-')+'</td><td>'+(i.sync_status||'-')+'</td><td>'+(i.sync_status_details&&i.sync_status_details.date?i.sync_status_details.date.substring(0,10):'-')+'</td><td>'+accounts+'</td></tr>';
+          var accts=(i.investments||[]).map(function(inv){return inv.name+' ('+fmt(inv.currency_value)+')';}).join('<br>');
+          return '<tr><td>'+(i.name||'-')+'</td><td>'+(i.sync_status||'-')+'</td><td>'+(i.sync_status_details&&i.sync_status_details.date?i.sync_status_details.date.substring(0,10):'-')+'</td><td>'+accts+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
 
     function loadData(){
-      if (_dataLoaded) return;
-      _dataLoaded = true;
-      document.getElementById('networth').textContent='...';
-      document.getElementById('poscount').textContent='...';
-      document.getElementById('txcount').textContent='...';
-      document.getElementById('instcount').textContent='...';
+      ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='...';});
       ['positions','transactions','institutions'].forEach(function(id){
         document.getElementById(id).innerHTML='<div class="loading"><div class="spinner"></div></div>';
       });
-
-      // Try SDK first, fall back to direct API
-      var useSDK = _sdkApi !== null;
-
-      var posP = useSDK ? _sdkApi.getPositions().catch(function(){ return apiFetch('/positions'); }) : apiFetch('/positions');
-      var txP  = useSDK ? _sdkApi.getTransactions({limit:200}).catch(function(){ return apiFetch('/transactions?limit=200'); }) : apiFetch('/transactions?limit=200');
-      var instP= useSDK ? _sdkApi.getInstitutions().catch(function(){ return apiFetch('/institutions'); }) : apiFetch('/institutions');
-
       Promise.all([
-        posP.catch(function(){return [];}),
-        txP.catch(function(){return [];}),
-        instP.catch(function(){return [];})
-      ]).then(function(results){
-        var positions=Array.isArray(results[0])?results[0]:[];
-        var transactions=Array.isArray(results[1])?results[1]:[];
-        var institutions=Array.isArray(results[2])?results[2]:[];
-        var nw=institutions.reduce(function(s,inst){
-          return s+(inst.investments||[]).reduce(function(a,inv){return a+(inv.currency_value||0);},0);
-        },0);
+        apiFetch('/positions').catch(function(){return [];}),
+        apiFetch('/transactions?limit=200').catch(function(){return [];}),
+        apiFetch('/institutions').catch(function(){return [];})
+      ]).then(function(r){
+        var pos=Array.isArray(r[0])?r[0]:[], tx=Array.isArray(r[1])?r[1]:[], inst=Array.isArray(r[2])?r[2]:[];
+        var nw=inst.reduce(function(s,i){return s+(i.investments||[]).reduce(function(a,v){return a+(v.currency_value||0);},0);},0);
         document.getElementById('networth').textContent=fmt(nw);
-        document.getElementById('poscount').textContent=positions.length;
-        document.getElementById('txcount').textContent=transactions.length;
-        document.getElementById('instcount').textContent=institutions.length;
-        renderPositions(positions);
-        renderTransactions(transactions);
-        renderInstitutions(institutions);
-      });
+        document.getElementById('poscount').textContent=pos.length;
+        document.getElementById('txcount').textContent=tx.length;
+        document.getElementById('instcount').textContent=inst.length;
+        renderPositions(pos);
+        renderTransactions(tx);
+        renderInstitutions(inst);
+      }).catch(function(e){toast('Error: '+e.message);});
     }
 
-    function refreshData(){
-      _dataLoaded = false;
-      loadData();
-      toast('Refreshing...');
-    }
+    function refreshData(){ loadData(); toast('Refreshing...'); }
 
-    addon.on('init', function(options, api){
-      _sdkApi = api;
+    // SDK only used for status badge — data loaded via direct API
+    addon.on('init', function(){
       document.getElementById('status').className='status connected';
       document.getElementById('status').textContent='Connected to Wealthica';
       loadData();
     });
-    addon.on('update', function(){ _dataLoaded=false; loadData(); });
-    addon.on('reload', function(){ _dataLoaded=false; loadData(); });
+    addon.on('update', loadData);
+    addon.on('reload', loadData);
 
-    // Fallback: if init fires (status shows connected) but data never loads, use direct API
     setTimeout(function(){
       var s=document.getElementById('status');
       if(s.classList.contains('connecting')){
         s.className='status error';
         s.textContent='Not inside Wealthica';
-      } else if (!_dataLoaded) {
-        // Init fired but data not loaded yet, try direct
-        loadData();
       }
-    }, 4000);
+    }, 6000);
   </script>
 </body>
 </html>
