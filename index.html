@@ -39,12 +39,24 @@
     .copy-hint{position:absolute;top:8px;right:10px;font-size:.7rem;color:#6b7280;cursor:pointer}
     .toast{position:fixed;bottom:20px;right:20px;background:#065f46;color:white;padding:10px 18px;border-radius:8px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
     .toast.show{opacity:1}
+    .setup-box{background:white;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:20px}
+    .setup-box h2{color:#5b21b6;margin-bottom:8px;font-size:1.1rem}
+    .setup-box p{color:#4a5568;font-size:.9rem;margin-bottom:16px;line-height:1.5}
+    .bookmarklet-btn{display:inline-block;background:#5b21b6;color:white;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.95rem;text-decoration:none;cursor:grab;border:2px dashed #7c3aed}
+    .bookmarklet-btn:hover{background:#4c1d95}
+    .step{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+    .step-num{background:#5b21b6;color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0;margin-top:2px}
+    .no-token-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;border-radius:8px;font-size:.85rem;margin-bottom:16px;display:none}
   </style>
 </head>
 <body>
   <h1>My Wealthica Dashboard</h1>
   <p class="subtitle">Personal portfolio overview</p>
   <span id="status" class="status connecting">Connecting...</span>
+
+  <div class="no-token-banner" id="noTokenBanner">
+    &#x26A0;&#xFE0F; Data not loading? Click the <strong>&#x1F4BE; Load Data</strong> bookmarklet in your browser toolbar, then click Refresh below.
+  </div>
 
   <div class="cards">
     <div class="card"><div class="card-label">Net Worth</div><div class="card-value" id="networth">-</div></div>
@@ -78,27 +90,15 @@
     var addon = new Addon();
     var BASE = 'https://app.wealthica.com/api';
     var _token = null;
+    var _dataLoaded = false;
 
-    // Get token: 1) from URL hash, 2) from postMessage, 3) from localStorage
-    function parseHash() {
-      var hash = location.hash.replace('#','');
-      if (!hash) return;
-      hash.split('&').forEach(function(part) {
-        var eq = part.indexOf('=');
-        if (eq > -1) {
-          var key = part.substring(0, eq);
-          var val = decodeURIComponent(part.substring(eq + 1));
-          if (key === 'token') _token = val;
-        }
-      });
-    }
-    parseHash();
-
-    // Also listen for token via postMessage from parent
+    // Listen for token via postMessage from the bookmarklet or parent
     window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'wealthica_token') {
+      if (e.data && e.data.type === 'wealthica_token' && e.data.token) {
         _token = e.data.token;
-        if (!_dataLoaded) loadData();
+        document.getElementById('noTokenBanner').style.display = 'none';
+        if (!_dataLoaded) { _dataLoaded = false; loadData(); }
+        else { _dataLoaded = false; loadData(); }
       }
     });
 
@@ -106,13 +106,11 @@
 
     function apiFetch(path) {
       var tok = getToken();
-      if (!tok) return Promise.reject(new Error('No token available'));
+      if (!tok) return Promise.reject(new Error('no_token'));
       return fetch(BASE + path, {
         headers: { 'Authorization': 'Bearer ' + tok }
       }).then(function(r) { return r.json(); });
     }
-
-    var _dataLoaded = false;
 
     function fmt(n){ return typeof n==='number'?('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})):(n||'-'); }
 
@@ -134,7 +132,7 @@
       if(box.style.display==='block'){box.style.display='none';return;}
       var tok=getToken();
       if(tok){document.getElementById('tokenText').textContent=tok;box.style.display='block';}
-      else{toast('Token not found — check URL hash contains token');}
+      else{toast('Click the bookmarklet first to load your token');}
     }
 
     function copyToken(){
@@ -158,7 +156,7 @@
 
     function renderInstitutions(data){
       var el=document.getElementById('institutions');
-      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected. Use + Add in Wealthica.</p>';return;}
+      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected.</p>';return;}
       el.innerHTML='<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>'+
         data.map(function(i){
           var accts=(i.investments||[]).map(function(inv){return inv.name+' ('+fmt(inv.currency_value)+')';}).join('<br>');
@@ -167,8 +165,16 @@
     }
 
     function loadData(){
-      if (!getToken()) { toast('No token — reconfigure addon URL with token'); return; }
+      if (!getToken()) {
+        document.getElementById('noTokenBanner').style.display='block';
+        ['positions','transactions','institutions'].forEach(function(id){
+          document.getElementById(id).innerHTML='<p class="empty">Click the &#x1F4BE; Load Data bookmarklet, then Refresh.</p>';
+        });
+        ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='-';});
+        return;
+      }
       _dataLoaded = true;
+      document.getElementById('noTokenBanner').style.display='none';
       ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='...';});
       ['positions','transactions','institutions'].forEach(function(id){
         document.getElementById(id).innerHTML='<div class="loading"><div class="spinner"></div></div>';
@@ -190,7 +196,7 @@
       });
     }
 
-    function refreshData(){ _dataLoaded=false; loadData(); toast('Refreshing...'); }
+    function refreshData(){ _dataLoaded=false; loadData(); if(getToken()) toast('Refreshing...'); }
 
     addon.on('init', function(){
       document.getElementById('status').className='status connected';
