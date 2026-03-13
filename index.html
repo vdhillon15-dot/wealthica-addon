@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Wealthica Dashboard</title>
+  <script src="https://wealthica.github.io/wealthica.js/dist/addon.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6fa;color:#2d3748;padding:20px}
+    h1{font-size:1.4rem;font-weight:700;color:#5b21b6;margin-bottom:4px}
+    .subtitle{font-size:.85rem;color:#718096;margin-bottom:20px}
+    .status{display:inline-block;padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-bottom:20px}
+    .connecting{background:#fef3c7;color:#92400e}
+    .connected{background:#d1fae5;color:#065f46}
+    .error{background:#fee2e2;color:#991b1b}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+    .card{background:white;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    .card-label{font-size:.75rem;color:#718096;text-transform:uppercase;letter-spacing:.05em}
+    .card-value{font-size:1.4rem;font-weight:700;color:#1a202c;margin-top:4px}
+    .tabs{display:flex;gap:4px;margin-bottom:16px}
+    .tab{padding:8px 16px;border:none;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;background:white;color:#718096}
+    .tab.active{background:#5b21b6;color:white}
+    .panel{display:none}.panel.active{display:block}
+    table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    thead{background:#5b21b6;color:white}
+    th{padding:10px 14px;text-align:left;font-size:.8rem;font-weight:600;text-transform:uppercase}
+    td{padding:10px 14px;font-size:.85rem;border-bottom:1px solid #f0f0f0}
+    tr:hover td{background:#faf5ff}
+    .empty{text-align:center;padding:40px;color:#a0aec0}
+    .loading{text-align:center;padding:40px}
+    .spinner{display:inline-block;width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#5b21b6;border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .refresh-btn{float:right;padding:6px 14px;background:#5b21b6;color:white;border:none;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer}
+  </style>
+</head>
+<body>
+  <h1>My Wealthica Dashboard</h1>
+  <p class="subtitle">Personal portfolio overview</p>
+  <span id="status" class="status connecting">Connecting...</span>
+  <div class="cards">
+    <div class="card"><div class="card-label">Net Worth</div><div class="card-value" id="netWorth">-</div></div>
+    <div class="card"><div class="card-label">Positions</div><div class="card-value" id="posCount">-</div></div>
+    <div class="card"><div class="card-label">Transactions</div><div class="card-value" id="txCount">-</div></div>
+    <div class="card"><div class="card-label">Institutions</div><div class="card-value" id="instCount">-</div></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('positions',this)">Positions</button>
+    <button class="tab" onclick="showTab('transactions',this)">Transactions</button>
+    <button class="tab" onclick="showTab('institutions',this)">Institutions</button>
+    <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+  </div>
+  <div id="panel-positions" class="panel active"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="panel-transactions" class="panel"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="panel-institutions" class="panel"><div class="loading"><div class="spinner"></div></div></div>
+  <script>
+    var addon,opts;
+    function fmt(v,c){if(v==null)return'-';return new Intl.NumberFormat('en-CA',{style:'currency',currency:c||'CAD',maximumFractionDigits:2}).format(v);}
+    function showTab(n,b){document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});document.getElementById('panel-'+n).classList.add('active');b.classList.add('active');}
+    function loading(p){document.getElementById('panel-'+p).innerHTML='<div class="loading"><div class="spinner"></div></div>';}
+    function loadAll(){
+      if(!addon||!opts)return;
+      loading('positions');loading('transactions');loading('institutions');
+      var q={from:opts.dateRangeFilter&&opts.dateRangeFilter[0],to:opts.dateRangeFilter&&opts.dateRangeFilter[1],groups:opts.groupsFilter,institutions:opts.institutionsFilter};
+      addon.api.getPositions(q).then(function(d){d=d||[];document.getElementById('posCount').textContent=d.length;document.getElementById('netWorth').textContent=fmt(d.reduce(function(s,p){return s+(p.market_value||0);},0));var rows=d.map(function(p){return '<tr><td><b>'+(p.security_name||p.security_id||'-')+'</b></td><td>'+(p.type||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+fmt(p.market_value,p.currency)+'</td><td>'+fmt(p.book_value,p.currency)+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('');document.getElementById('panel-positions').innerHTML=d.length?'<table><thead><tr><th>Security</th><th>Type</th><th>Qty</th><th>Market Value</th><th>Book Value</th><th>CCY</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No positions found.</div>';}).catch(function(e){document.getElementById('panel-positions').innerHTML='<div class="empty">Error: '+e+'</div>';});
+      addon.api.getTransactions(q).then(function(d){d=d||[];document.getElementById('txCount').textContent=d.length;var rows=d.slice(0,100).map(function(t){return '<tr><td>'+(t.date?t.date.slice(0,10):'-')+'</td><td>'+(t.type||'-')+'</td><td>'+(t.description||t.security_id||'-')+'</td><td>'+fmt(t.currency_amount!=null?t.currency_amount:t.amount,t.currency)+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('');document.getElementById('panel-transactions').innerHTML=d.length?'<table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>CCY</th></tr></thead><tbody>'+rows+'</tbody></table>'+(d.length>100?'<p style="text-align:center;padding:8px;color:#718096">Showing 100 of '+d.length+'</p>':''):'<div class="empty">No transactions found.</div>';}).catch(function(e){document.getElementById('panel-transactions').innerHTML='<div class="empty">Error: '+e+'</div>';});
+      addon.api.getInstitutions(q).then(function(d){d=d||[];document.getElementById('instCount').textContent=d.length;var rows=d.map(function(i){return '<tr><td><b>'+(i.name||'-')+'</b></td><td>'+(i.type||'-')+'</td><td>'+(i.institution_name||'-')+'</td><td>'+(i.status||'-')+'</td><td>'+(i.sync_date?i.sync_date.slice(0,10):'-')+'</td></tr>';}).join('');document.getElementById('panel-institutions').innerHTML=d.length?'<table><thead><tr><th>Name</th><th>Type</th><th>Institution</th><th>Status</th><th>Last Sync</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="empty">No institutions connected.</div>';}).catch(function(e){document.getElementById('panel-institutions').innerHTML='<div class="empty">Error: '+e+'</div>';});
+    }
+    addon=new Addon();
+    addon.on('init',function(o){opts=o;var s=document.getElementById('status');s.textContent='Connected to Wealthica';s.className='status connected';loadAll();});
+    addon.on('update',function(o){opts=Object.assign(opts||{},o);loadAll();});
+    addon.on('reload',function(){loadAll();});
+    setTimeout(function(){var s=document.getElementById('status');if(s.className.indexOf('connecting')>-1){s.textContent='Not inside Wealthica';s.className='status error';}},5000);
+  </script>
+</body>
+</html>
