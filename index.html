@@ -77,27 +77,42 @@
   <script>
     var addon = new Addon();
     var BASE = 'https://app.wealthica.com/api';
+    var _token = null;
 
-    function getToken() {
-      // We are in an iframe inside app.wealthica.com — access parent's localStorage
-      try {
-        var k = Object.keys(window.parent.localStorage).find(function(k){ return k.endsWith('.idToken'); });
-        if (k) return window.parent.localStorage.getItem(k);
-      } catch(e) {}
-      // Same-origin fallback
-      try {
-        var k2 = Object.keys(localStorage).find(function(k){ return k.endsWith('.idToken'); });
-        if (k2) return localStorage.getItem(k2);
-      } catch(e) {}
-      return null;
+    // Get token: 1) from URL hash, 2) from postMessage, 3) from localStorage
+    function parseHash() {
+      var hash = location.hash.replace('#','');
+      if (!hash) return;
+      hash.split('&').forEach(function(part) {
+        var eq = part.indexOf('=');
+        if (eq > -1) {
+          var key = part.substring(0, eq);
+          var val = decodeURIComponent(part.substring(eq + 1));
+          if (key === 'token') _token = val;
+        }
+      });
     }
+    parseHash();
+
+    // Also listen for token via postMessage from parent
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'wealthica_token') {
+        _token = e.data.token;
+        if (!_dataLoaded) loadData();
+      }
+    });
+
+    function getToken() { return _token; }
 
     function apiFetch(path) {
+      var tok = getToken();
+      if (!tok) return Promise.reject(new Error('No token available'));
       return fetch(BASE + path, {
-        credentials: 'include',
-        headers: { 'Authorization': 'Bearer ' + getToken() }
-      }).then(function(r){ return r.json(); });
+        headers: { 'Authorization': 'Bearer ' + tok }
+      }).then(function(r) { return r.json(); });
     }
+
+    var _dataLoaded = false;
 
     function fmt(n){ return typeof n==='number'?('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})):(n||'-'); }
 
@@ -119,7 +134,7 @@
       if(box.style.display==='block'){box.style.display='none';return;}
       var tok=getToken();
       if(tok){document.getElementById('tokenText').textContent=tok;box.style.display='block';}
-      else{toast('Token not found');}
+      else{toast('Token not found — check URL hash contains token');}
     }
 
     function copyToken(){
@@ -143,7 +158,7 @@
 
     function renderInstitutions(data){
       var el=document.getElementById('institutions');
-      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected.</p>';return;}
+      if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected. Use + Add in Wealthica.</p>';return;}
       el.innerHTML='<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>'+
         data.map(function(i){
           var accts=(i.investments||[]).map(function(inv){return inv.name+' ('+fmt(inv.currency_value)+')';}).join('<br>');
@@ -152,6 +167,8 @@
     }
 
     function loadData(){
+      if (!getToken()) { toast('No token — reconfigure addon URL with token'); return; }
+      _dataLoaded = true;
       ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='...';});
       ['positions','transactions','institutions'].forEach(function(id){
         document.getElementById(id).innerHTML='<div class="loading"><div class="spinner"></div></div>';
@@ -170,19 +187,18 @@
         renderPositions(pos);
         renderTransactions(tx);
         renderInstitutions(inst);
-      }).catch(function(e){toast('Error: '+e.message);});
+      });
     }
 
-    function refreshData(){ loadData(); toast('Refreshing...'); }
+    function refreshData(){ _dataLoaded=false; loadData(); toast('Refreshing...'); }
 
-    // SDK only used for status badge — data loaded via direct API
     addon.on('init', function(){
       document.getElementById('status').className='status connected';
       document.getElementById('status').textContent='Connected to Wealthica';
       loadData();
     });
-    addon.on('update', loadData);
-    addon.on('reload', loadData);
+    addon.on('update', function(){ _dataLoaded=false; loadData(); });
+    addon.on('reload', function(){ _dataLoaded=false; loadData(); });
 
     setTimeout(function(){
       var s=document.getElementById('status');
