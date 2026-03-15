@@ -73,152 +73,177 @@
     <div id="institutions" class="panel"><div class="loading"><div class="spinner"></div></div></div>
     <div class="toast" id="toast"></div>
     <script>
-          var addon = new Addon();
-          var BASE = 'https://app.wealthica.com/api';
-          var _token = null;
-          var _dataLoaded = false;
-          var _institutions = [];
+    var addon = new Addon();
+    var BASE = 'https://app.wealthica.com/api';
+    var _token = null;
+    var _dataLoaded = false;
+    var _institutions = [];
 
-          // Listen for token via postMessage from the bookmarklet - only load if not already loaded
-          window.addEventListener('message', function(e) {
-                  if (e.data && e.data.type === 'wealthica_token' && e.data.token) {
-                            _token = e.data.token;
-                            document.getElementById('noTokenBanner').style.display = 'none';
-                            if (!_dataLoaded) {
-                                        loadData();
-                            }
-                  }
-          });
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'wealthica_token' && e.data.token) {
+            _token = e.data.token;
+            document.getElementById('noTokenBanner').style.display = 'none';
+            if (!_dataLoaded) { loadData(); }
+        }
+    });
 
-          function getToken() { return _token; }
+    function getToken() { return _token; }
 
-          function apiFetch(path) {
-                  var tok = getToken();
-                  if (!tok) return Promise.reject(new Error('no_token'));
-                  return fetch(BASE + path, {
-                            headers: { 'Authorization': 'Bearer ' + tok }
-                  }).then(function(r) { return r.json(); });
-          }
+    function apiFetch(path) {
+        var tok = getToken();
+        if (!tok) return Promise.reject(new Error('no_token'));
+        return fetch(BASE + path, { headers: { 'Authorization': 'Bearer ' + tok } }).then(function(r) { return r.json(); });
+    }
 
-          function fmt(n){ return typeof n==='number'?('$'+n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})):(n||'-'); }
+    function fmt(n) {
+        return typeof n === 'number' ? ('$' + n.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2})) : (n || '-');
+    }
 
-          function showTab(id,btn){
-                  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
-                  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
-                  document.getElementById(id).classList.add('active');
-                  btn.classList.add('active');
-          }
+    function showTab(id, btn) {
+        document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+    }
 
-          function toast(msg){
-                  var t=document.getElementById('toast');
-                  t.textContent=msg;
-                  t.classList.add('show');
-            setTimeout(function(){t.classList.remove('show');},2500);
-          }
+    function toast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(function() { t.classList.remove('show'); }, 2500);
+    }
 
-          function toggleToken(){
-                  var box=document.getElementById('tokenBox');
-                  if(box.style.display==='block'){box.style.display='none';return;}
-                  var tok=getToken();
-                  if(tok){document.getElementById('tokenText').textContent=tok;box.style.display='block';}
-                  else{toast('Click the bookmarklet first to load your token');}
-          }
+    function toggleToken() {
+        var box = document.getElementById('tokenBox');
+        if (box.style.display === 'block') { box.style.display = 'none'; return; }
+        var tok = getToken();
+        if (tok) { document.getElementById('tokenText').textContent = tok; box.style.display = 'block'; }
+        else { toast('Click the bookmarklet first to load your token'); }
+    }
 
-          function copyToken(){
-                  navigator.clipboard.writeText(document.getElementById('tokenText').textContent)
-                    .then(function(){toast('Token copied!');});
-          }
+    function copyToken() {
+        navigator.clipboard.writeText(document.getElementById('tokenText').textContent).then(function() { toast('Token copied!'); });
+    }
 
-          function getInstitution(t){if(t.investment){for(var i=0;i<_institutions.length;i++){var inst=_institutions[i];var investments=inst.investments||[];for(var j=0;j<investments.length;j++){if(investments[j]._id===t.investment){return inst;}}}}return null;}
-    function hideLogo(el){el.style.display='none';}
-    function getBankCell(t){var inst=getInstitution(t);if(!inst)return '-';var logo=inst.logo?'<img class="bank-logo" src="'+inst.logo+'" alt="" onerror="hideLogo(this)">':'';return '<div class="bank-cell">'+logo+'<span>'+(inst.name||'-')+'</span></div>';}
-    function getTypeBadge(t){var inst=getInstitution(t);var itype=inst?(inst.type||'').toLowerCase():'';if(itype.includes('business')||itype.includes('corporate')||itype.includes('commercial')){return '<span class="badge badge-business">Business</span>';}return '<span class="badge badge-personal">Personal</span>';}
+    function hideLogo(el) { el.style.display = 'none'; }
 
-          function renderPositions(data){
-            var el=document.getElementById('positions');
-                  if(!data||!data.length){el.innerHTML='<p class="empty">No positions found.</p>';return;}
-                  el.innerHTML='<table><thead><tr><th>Account</th><th>Security</th><th>Symbol</th><th>Qty</th><th>Value</th><th>Currency</th></tr></thead><tbody>'+
-                            data.map(function(p){return '<tr><td>'+(p.investment_cache&&p.investment_cache.name||'-')+'</td><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
-          }
+    function getInstitution(t) {
+        if (t.investment) {
+            for (var i = 0; i < _institutions.length; i++) {
+                var inst = _institutions[i];
+                var investments = inst.investments || [];
+                for (var j = 0; j < investments.length; j++) {
+                    if (investments[j]._id === t.investment) { return inst; }
+                }
+            }
+        }
+        return null;
+    }
 
-          function renderTransactions(data){var el=document.getElementById('transactions');if(!data||!data.length){el.innerHTML='<p class="empty">No transactions found.</p>';return;}el.innerHTML='<table><thead><tr><th>Date</th><th>Bank</th><th>Type</th><th>Account</th><th>Description</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+data.map(function(t){var amt=t.currency_amount!=null?t.currency_amount:(t.amount!=null?t.amount:null);var amtClass=amt!=null?(amt<0?'amount-negative':'amount-positive'):'';var amtStr=amt!=null?('<span class="'+amtClass+'">'+fmt(amt)+'</span>'):'-';return '<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+getBankCell(t)+'</td><td>'+getTypeBadge(t)+'</td><td>'+(t.investment_cache&&t.investment_cache.name||'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+amtStr+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';}
-                  el.innerHTML='<table><thead><tr><th>Date</th><th>Bank</th><th>Account</th><th>Description</th><th>Type</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+
-                            data.map(function(t){return '<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+getBankName(t)+'</td><td>'+(t.investment_cache&&t.investment_cache.name||'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+(t.type||'-')+'</td><td>'+(t.amount!=null?fmt(t.amount):'-')+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
-          }
+    function getBankCell(t) {
+        var inst = getInstitution(t);
+        if (!inst) return '-';
+        var logo = inst.logo ? '<img class="bank-logo" src="' + inst.logo + '" alt="" onerror="hideLogo(this)">' : '';
+        return '<div class="bank-cell">' + logo + '<span>' + (inst.name || '-') + '</span></div>';
+    }
 
-          function renderInstitutions(data){
-                  var el=document.getElementById('institutions');
-                  if(!data||!data.length){el.innerHTML='<p class="empty">No institutions connected.</p>';return;}
-                  el.innerHTML='<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>'+
-                            data.map(function(i){
-                                        var accts=(i.investments||[]).map(function(inv){return inv.name+' ('+fmt(inv.currency_value)+')';}).join('<br>');
-                                        return '<tr><td>'+(i.name||'-')+'</td><td>'+(i.sync_status||'-')+'</td><td>'+(i.sync_status_details&&i.sync_status_details.date?i.sync_status_details.date.substring(0,10):'-')+'</td><td>'+accts+'</td></tr>';
-                            }).join('')+'</tbody></table>';
-          }
+    function getTypeBadge(t) {
+        var inst = getInstitution(t);
+        var itype = inst ? (inst.type || '').toLowerCase() : '';
+        if (itype.indexOf('business') !== -1 || itype.indexOf('corporate') !== -1 || itype.indexOf('commercial') !== -1) {
+            return '<span class="badge badge-business">Business</span>';
+        }
+        return '<span class="badge badge-personal">Personal</span>';
+    }
 
-          function loadData(){
-                  if (!getToken()) {
-                            document.getElementById('noTokenBanner').style.display='block';
-                            ['positions','transactions','institutions'].forEach(function(id){
-                                        document.getElementById(id).innerHTML='<p class="empty">Click the &#x1F4BE; Load Data bookmarklet, then Refresh.</p>';
-                            });
-                            ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='-';});
-                            return;
-                  }
-                  _dataLoaded = true;
-                  document.getElementById('noTokenBanner').style.display='none';
-                  ['networth','poscount','txcount','instcount'].forEach(function(id){document.getElementById(id).textContent='...';});
-                  ['positions','transactions','institutions'].forEach(function(id){
-                            document.getElementById(id).innerHTML='<div class="loading"><div class="spinner"></div></div>';
-                  });
-                  Promise.all([
-                            apiFetch('/positions').catch(function(){return [];}),
-                            apiFetch('/transactions?limit=2000&sort_by=date&sort_order=desc&from=2022-01-01').catch(function(){return [];}),
-                            apiFetch('/institutions').catch(function(){return [];})
-                          ]).then(function(r){
-                            var pos=Array.isArray(r[0])?r[0]:[],
-                                          tx=Array.isArray(r[1])?r[1]:[],
-                                          inst=Array.isArray(r[2])?r[2]:[];
-                            _institutions = inst;
-                            var nw=inst.reduce(function(s,i){return s+(i.investments||[]).reduce(function(a,v){return a+(v.currency_value||0);},0);},0);
-                            document.getElementById('networth').textContent=fmt(nw);
-                            document.getElementById('poscount').textContent=pos.length;
-                            document.getElementById('txcount').textContent=tx.length;
-                            document.getElementById('instcount').textContent=inst.length;
-                            renderPositions(pos);
-                            renderTransactions(tx);
-                            renderInstitutions(inst);
-                  });
-          }
+    function renderPositions(data) {
+        var el = document.getElementById('positions');
+        if (!data || !data.length) { el.innerHTML = '<p class="empty">No positions found.</p>'; return; }
+        el.innerHTML = '<table><thead><tr><th>Account</th><th>Security</th><th>Symbol</th><th>Qty</th><th>Value</th><th>Currency</th></tr></thead><tbody>' +
+            data.map(function(p) {
+                return '<tr><td>' + (p.investment_cache && p.investment_cache.name || '-') + '</td><td>' + (p.security_name || p.name || '-') + '</td><td>' + (p.symbol || '-') + '</td><td>' + (p.quantity != null ? p.quantity : '-') + '</td><td>' + (p.market_value != null ? fmt(p.market_value) : '-') + '</td><td>' + (p.currency || '-') + '</td></tr>';
+            }).join('') + '</tbody></table>';
+    }
 
-          function refreshData(){
-                  _dataLoaded=false;
-                  loadData();
-                  if(getToken()) toast('Refreshing...');
-          }
+    function renderTransactions(data) {
+        var el = document.getElementById('transactions');
+        if (!data || !data.length) { el.innerHTML = '<p class="empty">No transactions found.</p>'; return; }
+        el.innerHTML = '<table><thead><tr><th>Date</th><th>Bank</th><th>Type</th><th>Account</th><th>Description</th><th>Amount</th><th>Currency</th></tr></thead><tbody>' +
+            data.map(function(t) {
+                var amt = t.currency_amount != null ? t.currency_amount : (t.amount != null ? t.amount : null);
+                var amtClass = amt != null ? (amt < 0 ? 'amount-negative' : 'amount-positive') : '';
+                var amtStr = amt != null ? ('<span class="' + amtClass + '">' + fmt(amt) + '</span>') : '-';
+                return '<tr><td>' + (t.date ? t.date.substring(0, 10) : '-') + '</td><td>' + getBankCell(t) + '</td><td>' + getTypeBadge(t) + '</td><td>' + (t.investment_cache && t.investment_cache.name || '-') + '</td><td>' + (t.description || t.symbol || '-') + '</td><td>' + amtStr + '</td><td>' + (t.currency || '-') + '</td></tr>';
+            }).join('') + '</tbody></table>';
+    }
 
-          addon.on('init', function(){
-                  document.getElementById('status').className='status connected';
-                  document.getElementById('status').textContent='Connected to Wealthica';
-                  loadData();
-          });
+    function renderInstitutions(data) {
+        var el = document.getElementById('institutions');
+        if (!data || !data.length) { el.innerHTML = '<p class="empty">No institutions connected.</p>'; return; }
+        el.innerHTML = '<table><thead><tr><th>Institution</th><th>Status</th><th>Last Sync</th><th>Accounts</th></tr></thead><tbody>' +
+            data.map(function(i) {
+                var accts = (i.investments || []).map(function(inv) { return inv.name + ' (' + fmt(inv.currency_value) + ')'; }).join('<br>');
+                return '<tr><td>' + (i.name || '-') + '</td><td>' + (i.sync_status || '-') + '</td><td>' + (i.sync_status_details && i.sync_status_details.date ? i.sync_status_details.date.substring(0,10) : '-') + '</td><td>' + accts + '</td></tr>';
+            }).join('') + '</tbody></table>';
+    }
 
-          // Only reload if data hasn't been loaded yet to prevent infinite loop
-          addon.on('update', function(){
-                  if (!_dataLoaded) { loadData(); }
-          });
+    function loadData() {
+        if (!getToken()) {
+            document.getElementById('noTokenBanner').style.display = 'block';
+            ['positions','transactions','institutions'].forEach(function(id) {
+                document.getElementById(id).innerHTML = '<p class="empty">Click the &#x1F4BE; Load Data bookmarklet, then Refresh.</p>';
+            });
+            ['networth','poscount','txcount','instcount'].forEach(function(id) { document.getElementById(id).textContent = '-'; });
+            return;
+        }
+        _dataLoaded = true;
+        document.getElementById('noTokenBanner').style.display = 'none';
+        ['networth','poscount','txcount','instcount'].forEach(function(id) { document.getElementById(id).textContent = '...'; });
+        ['positions','transactions','institutions'].forEach(function(id) {
+            document.getElementById(id).innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        });
+        Promise.all([
+            apiFetch('/positions').catch(function() { return []; }),
+            apiFetch('/transactions?limit=2000&sort_by=date&sort_order=desc&from=2022-01-01').catch(function() { return []; }),
+            apiFetch('/institutions').catch(function() { return []; })
+        ]).then(function(r) {
+            var pos = Array.isArray(r[0]) ? r[0] : [],
+                tx  = Array.isArray(r[1]) ? r[1] : [],
+                inst = Array.isArray(r[2]) ? r[2] : [];
+            _institutions = inst;
+            var nw = inst.reduce(function(s,i) { return s + (i.investments||[]).reduce(function(a,v) { return a + (v.currency_value||0); }, 0); }, 0);
+            document.getElementById('networth').textContent = fmt(nw);
+            document.getElementById('poscount').textContent = pos.length;
+            document.getElementById('txcount').textContent = tx.length;
+            document.getElementById('instcount').textContent = inst.length;
+            renderPositions(pos);
+            renderTransactions(tx);
+            renderInstitutions(inst);
+        });
+    }
 
-          addon.on('reload', function(){
-                  if (!_dataLoaded) { loadData(); }
-          });
+    function refreshData() {
+        _dataLoaded = false;
+        loadData();
+        if (getToken()) toast('Refreshing...');
+    }
 
-          setTimeout(function(){
-                  var s=document.getElementById('status');
-                  if(s.classList.contains('connecting')){
-                            s.className='status error';
-                            s.textContent='Not inside Wealthica';
-                  }
-          }, 6000);
-    </script>
+    addon.on('init', function() {
+        document.getElementById('status').className = 'status connected';
+        document.getElementById('status').textContent = 'Connected to Wealthica';
+        loadData();
+    });
+
+    addon.on('update', function() { if (!_dataLoaded) { loadData(); } });
+    addon.on('reload', function() { if (!_dataLoaded) { loadData(); } });
+
+    setTimeout(function() {
+        var s = document.getElementById('status');
+        if (s.classList.contains('connecting')) {
+            s.className = 'status error';
+            s.textContent = 'Not inside Wealthica';
+        }
+    }, 6000);
+</script>
   </body>
 </html>
