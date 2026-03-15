@@ -44,34 +44,34 @@
   </head>
   <body>
       <h1>My Wealthica Dashboard</h1>
-    <p class="subtitle">Personal portfolio overview</p>p>
-    <span id="status" class="status connecting">Connecting...</span>span>
+    <p class="subtitle">Personal portfolio overview</p>
+    <span id="status" class="status connecting">Connecting...</span>
     <div class="no-token-banner" id="noTokenBanner">
         &#x26A0;&#xFE0F; Data not loading? Click the <strong>&#x1F4BE; Load Data</strong> bookmarklet in your browser toolbar, then click Refresh below.
-    </div>div>
+    </div>
     <div class="cards">
-        <div class="card"><div class="card-label">Net Worth</div>div><div class="card-value" id="networth">-</div>div></div>div>
-        <div class="card"><div class="card-label">Positions</div>div><div class="card-value" id="poscount">-</div>div></div>div>
-        <div class="card"><div class="card-label">Transactions</div>div><div class="card-value" id="txcount">-</div>div></div>div>
-        <div class="card"><div class="card-label">Institutions</div>div><div class="card-value" id="instcount">-</div>div></div>div>
-    </div>div>
+        <div class="card"><div class="card-label">Net Worth</div><div class="card-value" id="networth">-</div></div>
+        <div class="card"><div class="card-label">Positions</div><div class="card-value" id="poscount">-</div></div>
+        <div class="card"><div class="card-label">Transactions</div><div class="card-value" id="txcount">-</div></div>
+        <div class="card"><div class="card-label">Institutions</div><div class="card-value" id="instcount">-</div></div>
+    </div>
     <div class="toolbar">
-        <button class="btn btn-primary" onclick="refreshData()">&#x21BB; Refresh</button>button>
-        <button class="btn btn-secondary" onclick="toggleToken()">&#x1F511; Show API Token</button>button>
-    </div>div>
+        <button class="btn btn-primary" onclick="refreshData()">&#x21BB; Refresh</button>
+        <button class="btn btn-secondary" onclick="toggleToken()">&#x1F511; Show API Token</button>
+    </div>
     <div class="token-box" id="tokenBox">
-        <span class="copy-hint" onclick="copyToken()">&#x1F4CB; Copy</span>span>
-        <span id="tokenText"></span>span>
-    </div>div>
+        <span class="copy-hint" onclick="copyToken()">&#x1F4CB; Copy</span>
+        <span id="tokenText"></span>
+    </div>
     <div class="tabs">
-        <button class="tab active" onclick="showTab('positions',this)">Positions</button>button>
-        <button class="tab" onclick="showTab('transactions',this)">Transactions</button>button>
-        <button class="tab" onclick="showTab('institutions',this)">Institutions</button>button>
-    </div>div>
-    <div id="positions" class="panel active"><div class="loading"><div class="spinner"></div>div></div>div></div>div>
-    <div id="transactions" class="panel"><div class="loading"><div class="spinner"></div>div></div>div></div>div>
-    <div id="institutions" class="panel"><div class="loading"><div class="spinner"></div>div></div>div></div>div>
-    <div class="toast" id="toast"></div>div>
+        <button class="tab active" onclick="showTab('positions',this)">Positions</button>
+        <button class="tab" onclick="showTab('transactions',this)">Transactions</button>
+        <button class="tab" onclick="showTab('institutions',this)">Institutions</button>
+    </div>
+    <div id="positions" class="panel active"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="transactions" class="panel"><div class="loading"><div class="spinner"></div></div></div>
+    <div id="institutions" class="panel"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="toast" id="toast"></div>
     <script>
           var addon = new Addon();
           var BASE = 'https://app.wealthica.com/api';
@@ -234,8 +234,4 @@
           }, 6000);
     </script>
   </body>
-</html>html>
-    </script></strong></h1>
-  </body>
-    </style></title>
-  </head>
+</html>
