@@ -40,7 +40,7 @@
           .toast{position:fixed;bottom:20px;right:20px;background:#065f46;color:white;padding:10px 18px;border-radius:8px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
           .toast.show{opacity:1}
           .no-token-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;border-radius:8px;font-size:.85rem;margin-bottom:16px;display:none}
-        </style>
+        .bank-logo{width:22px;height:22px;border-radius:4px;object-fit:contain;vertical-align:middle;margin-right:6px;background:#f0f0f0;}.bank-cell{display:flex;align-items:center;gap:4px;white-space:nowrap;}.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.7rem;font-weight:700;letter-spacing:.03em;}.badge-personal{background:#dbeafe;color:#1e40af;}.badge-business{background:#fef3c7;color:#92400e;}.amount-positive{color:#065f46;font-weight:600;}.amount-negative{color:#991b1b;font-weight:600;}</style>
   </head>
   <body>
       <h1>My Wealthica Dashboard</h1>
@@ -129,21 +129,9 @@
                     .then(function(){toast('Token copied!');});
           }
 
-          function getBankName(t) {
-            // Try to find the institution name from the investment id
-                  if (t.investment) {
-                            for (var i = 0; i < _institutions.length; i++) {
-                                        var inst = _institutions[i];
-                                        var investments = inst.investments || [];
-                                        for (var j = 0; j < investments.length; j++) {
-                                                      if (investments[j]._id === t.investment) {
-                                                                      return inst.name || '-';
-                                                      }
-                                        }
-                            }
-                  }
-                  return '-';
-          }
+          function getInstitution(t){if(t.investment){for(var i=0;i<_institutions.length;i++){var inst=_institutions[i];var investments=inst.investments||[];for(var j=0;j<investments.length;j++){if(investments[j]._id===t.investment){return inst;}}}}return null;}
+    function getBankCell(t){var inst=getInstitution(t);if(!inst)return '-';var logo=inst.logo?'<img class="bank-logo" src="'+inst.logo+'" alt="" onerror="this.style.display='none'">':'';return '<div class="bank-cell">'+logo+'<span>'+(inst.name||'-')+'</span></div>';}
+    function getTypeBadge(t){var inst=getInstitution(t);var itype=inst?(inst.type||'').toLowerCase():'';if(itype.includes('business')||itype.includes('corporate')||itype.includes('commercial')){return '<span class="badge badge-business">Business</span>';}return '<span class="badge badge-personal">Personal</span>';}
 
           function renderPositions(data){
             var el=document.getElementById('positions');
@@ -152,9 +140,7 @@
                             data.map(function(p){return '<tr><td>'+(p.investment_cache&&p.investment_cache.name||'-')+'</td><td>'+(p.security_name||p.name||'-')+'</td><td>'+(p.symbol||'-')+'</td><td>'+(p.quantity!=null?p.quantity:'-')+'</td><td>'+(p.market_value!=null?fmt(p.market_value):'-')+'</td><td>'+(p.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
           }
 
-          function renderTransactions(data){
-                  var el=document.getElementById('transactions');
-                  if(!data||!data.length){el.innerHTML='<p class="empty">No transactions found.</p>';return;}
+          function renderTransactions(data){var el=document.getElementById('transactions');if(!data||!data.length){el.innerHTML='<p class="empty">No transactions found.</p>';return;}el.innerHTML='<table><thead><tr><th>Date</th><th>Bank</th><th>Type</th><th>Account</th><th>Description</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+data.map(function(t){var amt=t.currency_amount!=null?t.currency_amount:(t.amount!=null?t.amount:null);var amtClass=amt!=null?(amt<0?'amount-negative':'amount-positive'):'';var amtStr=amt!=null?('<span class="'+amtClass+'">'+fmt(amt)+'</span>'):'-';return '<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+getBankCell(t)+'</td><td>'+getTypeBadge(t)+'</td><td>'+(t.investment_cache&&t.investment_cache.name||'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+amtStr+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';}
                   el.innerHTML='<table><thead><tr><th>Date</th><th>Bank</th><th>Account</th><th>Description</th><th>Type</th><th>Amount</th><th>Currency</th></tr></thead><tbody>'+
                             data.map(function(t){return '<tr><td>'+(t.date?t.date.substring(0,10):'-')+'</td><td>'+getBankName(t)+'</td><td>'+(t.investment_cache&&t.investment_cache.name||'-')+'</td><td>'+(t.description||t.symbol||'-')+'</td><td>'+(t.type||'-')+'</td><td>'+(t.amount!=null?fmt(t.amount):'-')+'</td><td>'+(t.currency||'-')+'</td></tr>';}).join('')+'</tbody></table>';
           }
