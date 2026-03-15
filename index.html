@@ -130,7 +130,8 @@
           }
 
           function getInstitution(t){if(t.investment){for(var i=0;i<_institutions.length;i++){var inst=_institutions[i];var investments=inst.investments||[];for(var j=0;j<investments.length;j++){if(investments[j]._id===t.investment){return inst;}}}}return null;}
-    function getBankCell(t){var inst=getInstitution(t);if(!inst)return '-';var logo=inst.logo?'<img class="bank-logo" src="'+inst.logo+'" alt="" onerror="this.style.display='none'">':'';return '<div class="bank-cell">'+logo+'<span>'+(inst.name||'-')+'</span></div>';}
+    function hideLogo(el){el.style.display='none';}
+    function getBankCell(t){var inst=getInstitution(t);if(!inst)return '-';var logo=inst.logo?'<img class="bank-logo" src="'+inst.logo+'" alt="" onerror="hideLogo(this)">':'';return '<div class="bank-cell">'+logo+'<span>'+(inst.name||'-')+'</span></div>';}
     function getTypeBadge(t){var inst=getInstitution(t);var itype=inst?(inst.type||'').toLowerCase():'';if(itype.includes('business')||itype.includes('corporate')||itype.includes('commercial')){return '<span class="badge badge-business">Business</span>';}return '<span class="badge badge-personal">Personal</span>';}
 
           function renderPositions(data){
