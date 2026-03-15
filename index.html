@@ -186,7 +186,7 @@
                   });
                   Promise.all([
                             apiFetch('/positions').catch(function(){return [];}),
-                            apiFetch('/transactions?limit=500&sort_by=date&sort_order=desc').catch(function(){return [];}),
+                            apiFetch('/transactions?limit=2000&sort_by=date&sort_order=desc&from=2022-01-01').catch(function(){return [];}),
                             apiFetch('/institutions').catch(function(){return [];})
                           ]).then(function(r){
                             var pos=Array.isArray(r[0])?r[0]:[],
